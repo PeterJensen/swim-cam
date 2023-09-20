@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<!--
+  Author: Peter Jensen
+-->
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swim Cam</title>
+<style>
+  BODY {
+    font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-size: 14px;
+    margin:0;
+  }
+  DIV {
+    padding-top:4px;
+    padding-bottom:4px;
+  }
+  .slim {
+    padding-top:1px;
+    padding-bottom:1px;
+  }
+  .bold {
+    font-weight:700;
+  }
+  .title {
+    background-color: #711;
+    color: #fff;
+    text-align:center;
+    font-size: 18px;
+    font-weight:700;
+  }
+  .header {
+    text-align:center;
+    font-weight:700;
+  }
+  .button {
+    color:#fff;
+    background-color:rgb(9, 9, 80);
+    padding:6px 12px;
+    border:2px solid #fff;
+  }
+  .grey {
+    color: #aaa;
+  }
+  .hidden {
+    display:none;
+  }
+  .center {
+    text-align:center;
+  }
+  .row {
+    margin:0;
+    padding:0;
+  }
+  .row:after {
+    content: " ";
+    display: block;
+    clear: both;
+  }
+  .col-1 {width:8.33%;float:left;}
+  .col-2 {width:16.66%;float:left;}
+  .col-3 {width:25.00%;float:left;}
+  .col-4 {width:33.33%;float:left;}
+  .col-5 {width:41.66%;float:left;}
+  .col-6 {width:50.00%;float:left;}
+  .col-7 {width:58.33%;float:left;}
+  .col-8 {width:66.66%;float:left;}
+  .col-9 {width:75.00%;float:left;}
+  .col-10 {width:83.33%;float:left;}
+  .col-11 {width:91.66%;float:left;}
+  .col-12 {width:100.00%;float:left;}
+  .col-offset-1 {margin-left:8.33%;}
+  .col-offset-2 {margin-left:16.66%;}
+  .col-offset-4 {margin-left:33.33%;}
+  .clickable {
+    cursor:pointer;
+  }
+</style>
+</head>
+<body>
+  <div class="title">Swims</div>
+  <div id="content"></div>
+<script>
+// Small JQuery-like utility
+class JQSelect {
+  static createNode(tagName) {
+    // strip off <>
+    tagName = tagName.substring(1, tagName.length-1);
+    return document.createElement(tagName);
+  }
+  constructor(param) {
+    this.elems = null;
+    if (typeof param === "string") {
+      if (param.charAt(0) === "<") {
+        this.elems = [JQSelect.createNode(param)];
+      }
+      else {
+        this.elems = document.querySelectorAll(param);
+      }
+    }
+    else if (param instanceof Element) {
+      this.elems = [param];
+    }
+    else if (typeof param === "function") {
+      window.addEventListener('load', param);
+    }
+  }
+  on(eventName, handler) {
+    this.elems.forEach((e) => e.addEventListener(eventName, handler));
+    return this;
+  }
+  text(txt) {
+    if (this.elems == null)
+      return this;
+    if (typeof txt === 'undefined')
+      return this.elems[0].innerText;
+    else {
+      this.elems.forEach((e) => e.innerText = txt);
+      return this;
+    }
+  }
+  html(txt) {
+    if (this.elems == null)
+      return this;
+    if (typeof txt === 'undefined')
+      return this.elems[0].innerHTML;
+    else {
+      this.elems.forEach((e) => e.innerHTML = txt);
+      return this;
+    }
+  }
+  show() {
+    this.elems.forEach((e) => e.style.display = 'block');
+  }
+  hide() {
+    this.elems.forEach((e) => e.style.display = 'none');
+  }
+  val(...value) {
+    if (value.length === 0) {
+      return this.elems[0].value;
+    }
+    else {
+      return this.attr('value', value[0]);
+    }
+  }
+  empty() {
+    while (this.elems[0].firstChild) {
+      this.elems[0].removeChild(this.elems[0].lastChild);
+    }
+    return this;
+  }
+  append(...nodes) {
+    for (const node of nodes)
+      this.elems[0].appendChild(node.elems[0]);
+    return this;
+  }
+  addClass(cls) {
+    let clsArray = cls.split(/\s+/);
+    this.elems.forEach((e) => e.classList.add(...clsArray));
+    return this;
+  }
+  removeClass(cls) {
+    this.elems.forEach((e) => e.classList.remove(cls));
+    return this;
+  }
+  hasClass(cls) {
+    return this.elems[0].classList.contains(cls);
+  }
+  attr(attrib, ...value) {
+    if (value.length === 0) {
+      return this.elems[0].getAttribute(attrib)
+    }
+    else {
+      this.elems.forEach((e) => e.setAttribute(attrib, value[0]));
+      return this;
+    }
+  }
+  each(callback) {
+    this.elems.forEach((elem) => callback($(elem)));
+  }
+  width() {
+    return this.elems[0].width;
+  }
+  css(prop, ...value) {
+    if (value.length === 0) {
+      return this.elems[0].style[prop];
+    }
+    else {
+      this.elems.forEach((e) => e.style[prop] = value[0]);
+      return this;
+    }
+  }
+}
+function $(param) {
+  return new JQSelect(param);
+}
+// JQuery-like utility end
+
+class Config {
+  static groupsUrl      = "./groups.php";
+  static imagesUrl      = "./images.php";
+  static imageUrl       = "./image.php";
+}
+
+class Log {
+  static log(msg) {
+    console.log(msg);
+  }
+}
+
+class ImageSequence {
+  constructor (images) {
+    this.images = images;
+    this.sgIndex = 0;
+    this.tsIndex = 0;
+  }
+  stepFwd(n) {
+    let ni = this.tsIndex + n;
+    let lsg = this.images.length;
+    if (lsg == 0)
+      return;
+    let lts = this.images[this.sgIndex].length;
+    if (lts == 0)
+      return;
+    while ((ni > lts - 1) && (this.sgIndex < lsg - 1)) {
+      this.sgIndex += 1;
+      ni -= lts;
+      lts = this.images[this.sgIndex].length;
+    }
+    if (ni >= lts)
+      ni = lts-1;
+    this.tsIndex = ni;
+  }
+  stepBck(n) {
+    let ni = this.tsIndex - n;
+    let lts = this.tsIndex + 1;
+    let lsg = this.images.length;
+    if (lsg == 0)
+      return;
+    while (ni < 0 && this.sgIndex > 0) {
+      this.sgIndex -= 1;
+      lts = this.images[this.sgIndex].length;
+      ni += lts;
+    }
+    if (ni < 0)
+      ni = 0;
+    this.tsIndex = ni;
+  }
+  step(n) {
+    if (n > 0)
+      this.stepFwd(n);
+    else
+      this.stepBck(-n);
+  }
+  current() {
+    if (this.images.length == 0 || this.images[this.sgIndex].length == 0)
+      return [null, null];
+    else
+      return [this.sgIndex, this.images[this.sgIndex][this.tsIndex]];
+  }
+}
+
+class UI {
+  static ids = {
+  }
+  static initIds() {
+    UI.ids.$content = $("#content");
+  }
+  static zeroFill(val, len) {
+    let sv = val.toString();
+    while (sv.length < len)
+      sv = '0' + sv;
+    return sv;
+  }
+
+  static async getImages(group) {
+    let images = [];
+    let sg = 0;
+    while (true) {
+      let sgRes = await fetch(Config.imagesUrl + "?group=" + group + "&subgroup=" + sg);
+      let sgImages = await sgRes.json();
+      if (sgImages.length == 0)
+        break;
+      sgImages.sort((a, b) => a - b);
+      images.push(sgImages);
+      sg += 1;
+    }
+    return images;
+  }
+
+  static imageSrc(group, subgroup, timestamp) {
+    return Config.imageUrl +
+           '?group=' + group +
+           '&subgroup=' + subgroup +
+           '&timestamp=' + timestamp;
+  }
+  static makeImageViewer(group, images) {
+    function formatTimestamp(ts) {
+      const mins = UI.zeroFill(Math.trunc(ts/60000), 2);
+      const secs = UI.zeroFill(Math.trunc((ts - mins*60000)/1000), 2);
+      const ms   = UI.zeroFill(ts - mins*60000 - secs*1000, 3);
+      return mins + ':' + secs + '.' + ms;
+    }
+    let imgSeq = new ImageSequence(images);
+    const $img = $('<img>').addClass('col-12');
+    const $time = $('<div>').addClass('col-12 center');
+    function updateImage() {
+      const [sg, ts] = imgSeq.current();
+      if (sg == null || ts == null)
+        return;
+      const imgSrc = UI.imageSrc(group, sg, ts);
+      $img.attr('src', imgSrc);
+      $time.text(formatTimestamp(ts));
+    }
+    function clickSuperFastBck() {
+      imgSeq.step(-100);
+      updateImage();
+    }
+    function clickFastBck() {
+      imgSeq.step(-10);
+      updateImage();
+    }
+    function clickBck() {
+      imgSeq.step(-1);
+      updateImage();
+    }
+    function clickFwd() {
+      imgSeq.step(1);
+      updateImage();
+    }
+    function clickFastFwd() {
+      imgSeq.step(10);
+      updateImage();
+    }
+    function clickSuperFastFwd() {
+      imgSeq.step(100);
+      updateImage();
+    }
+    let   $content = UI.ids.$content;
+    $content.empty();
+    updateImage();
+    const $header = $('<div>').addClass('header').text('Group: ' + group);
+    const $control = $('<div>').addClass('row');
+    const $superFastBckBtn = $('<button>').addClass('button col-2').text('<<<').on('click', clickSuperFastBck);
+    const $fastBckBtn      = $('<button>').addClass('button col-2').text('<<').on('click', clickFastBck);
+    const $bckBtn          = $('<button>').addClass('button col-2').text('<').on('click', clickBck);
+    const $fwdBtn          = $('<button>').addClass('button col-2').text('>').on('click', clickFwd);
+    const $fastFwdBtn      = $('<button>').addClass('button col-2').text('>>').on('click', clickFastFwd);
+    const $superFastFwdBtn = $('<button>').addClass('button col-2').text('>>>').on('click', clickSuperFastFwd);
+    $control.append($superFastBckBtn, $fastBckBtn, $bckBtn, $fwdBtn, $fastFwdBtn, $superFastFwdBtn);
+    $content.append($header, $time, $img, $control);
+  }
+
+  static makeGroups(groups) {
+    function getClickHandler(group) {
+      return function() {
+        UI.getImages(group)
+        .then(images => UI.makeImageViewer(group, images));
+      }
+    }
+    let   $content = UI.ids.$content;
+    const $title = $('<div>').addClass('header').text("Available Groups");
+    $content.append($title);
+    let $row = null;
+    let rowLen = 0;
+    for (let g = groups.length - 1; g >= 0; g--) {
+      if (rowLen == 6) {
+        $content.append($row);
+        $row = null;
+        rowLen = 0;
+      }
+      if ($row == null) {
+        $row = $('<div>').addClass('row');
+      }
+      let $button = $('<button>').addClass('col-2 button').text(g);
+      $button.on('click', getClickHandler(g));
+      $row.append($button);
+      rowLen += 1;
+    }
+    if (rowLen > 0)
+      $content.append($row);
+  }
+
+  static async init() {
+    UI.initIds();
+    let groups = await fetch(Config.groupsUrl).then(res => res.json());
+    UI.makeGroups(groups);
+  }
+
+}
+
+function main() {
+  UI.init();
+}
+
+$(main);
+</script>
+</body>
+</html>

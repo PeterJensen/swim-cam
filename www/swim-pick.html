@@ -1,0 +1,405 @@
+<!doctype html>
+<!--
+  Author: Peter Jensen
+-->
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swim Cam - Pick</title>
+<style>
+  :root {
+    --width:800px;
+    --img-width:600px;
+  }
+  @media (max-width: 800px) {
+    :root {
+      --width:97%;
+      --img-width:100%;
+    }
+  }
+  body {
+    font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-size: 14px;
+    width:var(--width);
+    margin:auto;
+  }
+  img {
+    width: var(--img-width);
+    text-align:center;
+    padding:0px;
+  }
+  #files {
+    width: 200px;
+    height: 10em;
+    overflow:scroll;
+    float:left;
+  }
+  .header {
+    text-align:center;
+    font-weight:700;
+  }
+  .center {
+    text-align:center;
+  }
+  .button {
+    color:#fff;
+    background-color:rgb(9, 9, 80);
+    padding:6px 12px;
+    border:2px solid #fff;
+  }
+  .col-2 {
+    width:16.7%;
+  }
+</style>
+</head>
+<body>
+  <h1 class="header">Swim Picks</h1>
+  <p>
+    There was a total of 16,770 images from the swim, 688 'good' ones that wasn't just water droplets, and 92 which was also in focus. So 82 images with 'something' out of 16,770. That's ~0.5%. My device needs some improvements! You can choose all the good ones, or just the best of the good ones, by clicking one of the buttons below.
+  </p>
+  <div class="center">
+    <button id="good" class="button col-2">Good</button>
+    <button id="best" class="button col-2">Best</button>
+  </div>
+  <div id="image-container" class="center">
+    <img id="image"/>
+    <p id="image-name"></p>
+  </div>
+  <div id="play-controls" class="center">
+    <button id="left-fast-btn" class="button col-2">&lt;&lt;</button>
+    <button id="left-btn" class="button col-2">&lt;</button>
+    <button id="play-pause-btn" class="button col-2">Play</button>
+    <button id="right-btn" class="button col-2">&gt;</button>
+    <button id="right-fast-btn" class="button col-2">&gt;&gt;</button>
+  </div>
+  <div id="edit-controls" style="display:none">
+    <div id="files"></div>
+    <button id="copy" class="button">Copy to Clipboard</button>
+  </div>
+<script src="./all-images.js"></script>
+<script src="./good-images.js"></script>
+<script src="./best-images.js"></script>
+<script>
+// Small JQuery-like utility
+class JQSelect {
+  static createNode(tagName) {
+    // strip off <>
+    tagName = tagName.substring(1, tagName.length-1);
+    return document.createElement(tagName);
+  }
+  constructor(param) {
+    this.elems = null;
+    if (typeof param === "string") {
+      if (param.charAt(0) === "<") {
+        this.elems = [JQSelect.createNode(param)];
+      }
+      else {
+        this.elems = document.querySelectorAll(param);
+      }
+    }
+    else if (param instanceof Element) {
+      this.elems = [param];
+    }
+    else if (typeof param === "function") {
+      window.addEventListener('load', param);
+    }
+  }
+  on(eventName, handler) {
+    this.elems.forEach((e) => e.addEventListener(eventName, handler));
+    return this;
+  }
+  text(txt) {
+    if (this.elems == null)
+      return this;
+    if (typeof txt === 'undefined')
+      return this.elems[0].innerText;
+    else {
+      this.elems.forEach((e) => e.innerText = txt);
+      return this;
+    }
+  }
+  html(txt) {
+    if (this.elems == null)
+      return this;
+    if (typeof txt === 'undefined')
+      return this.elems[0].innerHTML;
+    else {
+      this.elems.forEach((e) => e.innerHTML = txt);
+      return this;
+    }
+  }
+  show() {
+    this.elems.forEach((e) => e.style.display = 'block');
+  }
+  hide() {
+    this.elems.forEach((e) => e.style.display = 'none');
+  }
+  val(...value) {
+    if (value.length === 0) {
+      return this.elems[0].value;
+    }
+    else {
+      return this.attr('value', value[0]);
+    }
+  }
+  empty() {
+    while (this.elems[0].firstChild) {
+      this.elems[0].removeChild(this.elems[0].lastChild);
+    }
+    return this;
+  }
+  append(...nodes) {
+    for (const node of nodes)
+      this.elems[0].appendChild(node.elems[0]);
+    return this;
+  }
+  addClass(cls) {
+    let clsArray = cls.split(/\s+/);
+    this.elems.forEach((e) => e.classList.add(...clsArray));
+    return this;
+  }
+  removeClass(cls) {
+    this.elems.forEach((e) => e.classList.remove(cls));
+    return this;
+  }
+  hasClass(cls) {
+    return this.elems[0].classList.contains(cls);
+  }
+  attr(attrib, ...value) {
+    if (value.length === 0) {
+      return this.elems[0].getAttribute(attrib)
+    }
+    else {
+      this.elems.forEach((e) => e.setAttribute(attrib, value[0]));
+      return this;
+    }
+  }
+  each(callback) {
+    this.elems.forEach((elem) => callback($(elem)));
+  }
+  width() {
+    return this.elems[0].width;
+  }
+  css(prop, ...value) {
+    if (value.length === 0) {
+      return this.elems[0].style[prop];
+    }
+    else {
+      this.elems.forEach((e) => e.style[prop] = value[0]);
+      return this;
+    }
+  }
+}
+function $(param) {
+  return new JQSelect(param);
+}
+// JQuery-like utility end
+
+function imgSrc(subgroup, timestamp) {
+//  return "image.php?dir=./downloads" +
+  return "image.php?dir=./good" +
+         "&group=3" +
+         "&subgroup=" + subgroup +
+         "&timestamp=" + timestamp;
+}
+
+class ImageAccess {
+  constructor(images) {
+    this.sg = 0;
+    this.tsi = 0;
+    this.sgStart = null;
+    this.images = images;
+    this.imageNum = 0;
+    this.imageCount = 0;
+    for (let sg = 0; sg < this.images.length; sg++) {
+      if (this.sgStart == null && this.images[sg].length > 0) {
+        this.sg = sg;
+        this.tsi = 0;
+        this.sgStart = sg;
+      }
+      this.imageCount += this.images[sg].length;
+    }
+  }
+  step(n) {
+    if (n >= 0)
+      return this.stepFwd(n);
+    else
+      return this.stepBck(-n);
+  }
+  stepFwd(n) {
+    this.tsi += n;
+    this.imageNum += n;
+    while (this.tsi >= this.images[this.sg].length && this.sg < this.images.length-1) {
+      this.tsi -= this.images[this.sg].length;
+      this.sg += 1;
+    }
+    if (this.tsi >= this.images[this.sg].length) {
+      this.imageNum = this.imageCount - 1;
+      this.tsi = this.images[this.sg].length - 1;
+      return false;
+    }
+    else
+      return true;
+  }
+  stepBck(n) {
+    this.tsi -= n;
+    this.imageNum -= n;
+    while (this.tsi < 0 && this.sg > 0) {
+      this.sg -= 1;
+      this.tsi += this.images[this.sg].length
+    }
+    if (this.tsi < 0) {
+      this.tsi = 0;
+      this.sg = this.sgStart;
+      this.imageNum = 0;
+      return false;
+    }
+    else
+      return true;
+  }
+  timestamp() {
+    return this.images[this.sg][this.tsi];
+  }
+}
+
+function main() {
+  const $img = $("#image");
+  const $imgName = $("#image-name");
+  const $files = $("#files");
+  const $imageContainer = $("#image-container");
+  const $copy = $("#copy");
+  const $editControls = $("#edit-controls");
+  const $playPauseBtn = $("#play-pause-btn");
+//  let ima = new ImageAccess(allImages);
+  let imaGood = new ImageAccess(goodImages);
+  let imaBest = new ImageAccess(bestImages);
+  let ima = imaBest;
+  let isPlaying = false;
+
+  function zeroFill(val, len) {
+    let sv = val.toString();
+    while (sv.length < len)
+      sv = '0' + sv;
+    return sv;
+  }
+  function formatTimestamp(ts) {
+    const mins = zeroFill(Math.trunc(ts/60000), 2);
+    const secs = zeroFill(Math.trunc((ts - mins*60000)/1000), 2);
+    const ms   = zeroFill(ts - mins*60000 - secs*1000, 3);
+    return mins + ':' + secs + '.' + ms;
+  }
+  function formatFilename(sg, ts) {
+    return zeroFill(sg, 4) + "/" +
+          zeroFill(ts, 8) + ".jpg";
+  }
+  function updateImage() {
+    $img.attr("src", imgSrc(ima.sg, ima.timestamp()));
+    let caption = "Time: " + formatTimestamp(ima.timestamp());
+    caption += ", File: " + formatFilename(ima.sg, ima.timestamp());
+    caption += ", tsi:" + zeroFill(ima.tsi, 2);
+    caption += ", " + zeroFill(ima.imageNum, 5) + "/" + zeroFill(ima.imageCount-1, 5);
+    $imgName.text(caption);
+  }
+  function appendTo($node, str) {
+    $node.text($node.text() + str + "\n");
+  }
+  function removeFrom($node, str) {
+    let content = $node.text();
+    let i = content.indexOf(str);
+    while (i != -1) {
+      content = content.substring(0, i) + content.substring(i + str.length + 1);
+      i = content.indexOf(str);
+    }
+    $node.text(content);
+  }
+  function keyDown(event) {
+    if (event.key == 'ArrowRight') {
+      if (event.shiftKey)
+        ima.step(100);
+      else
+        ima.step(1);
+      updateImage();
+    }
+    else if (event.key == 'ArrowLeft') {
+      if (event.shiftKey)
+        ima.step(-100);
+      else
+        ima.step(-1);
+      updateImage();
+    }
+    else if (event.code == 'Space') {
+      const fileName = formatFilename(ima.sg, ima.timestamp());
+      if (event.shiftKey)
+        removeFrom($files, fileName);
+      else
+        appendTo($files, fileName);
+      $files.elems[0].scrollTop = $files.elems[0].scrollHeight;
+    }
+  }
+  function clickGood() {
+    ima = imaGood;
+    updateImage();
+  }
+  function clickBest() {
+    ima = imaBest;
+    updateImage();
+  }
+  function clickLeft() {
+    ima.step(-1);
+    updateImage();
+  }
+  function clickRight() {
+    ima.step(1);
+    updateImage();
+  }
+  function clickLeftFast() {
+    ima.step(-100);
+    updateImage();
+  }
+  function clickRightFast() {
+    ima.step(100);
+    updateImage();
+  }
+  function play() {
+    didStep = ima.step(1);
+    updateImage();
+    if (isPlaying) {
+      if (didStep)
+        setTimeout(play, 200);
+      else {
+        $playPauseBtn.text("Play");
+        isPlaying = false;
+      }
+    }
+  }
+  function clickPlayPause() {
+    if (isPlaying)
+      $playPauseBtn.text("Play");
+    else
+      $playPauseBtn.text("Pause");
+    isPlaying = !isPlaying;
+    if (isPlaying)
+      play();
+  }
+  async function copyToClipboard() {
+    await navigator.clipboard.writeText($files.text());
+  }
+  let url = new URL(location.href);
+  if (url.searchParams.get("edit") != null) {
+    $editControls.css("display", "contents");
+  }
+  updateImage();
+  $(document.body).on('keydown', keyDown);
+  $("#best").on('click', clickBest);
+  $("#good").on('click', clickGood);
+  $("#left-btn").on('click', clickLeft);
+  $("#right-btn").on('click', clickRight);
+  $("#left-fast-btn").on('click', clickLeftFast);
+  $("#right-fast-btn").on('click', clickRightFast);
+  $playPauseBtn.on('click', clickPlayPause);
+  $copy.on('click', copyToClipboard);
+}
+$(main);
+</script>
+</body>
+</html>

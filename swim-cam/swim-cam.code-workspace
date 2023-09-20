@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "CameraWebServer",
+			"path": "../../CameraWebServer"
+		},
+		{
+			"name": "SDMMC_TEST",
+			"path": "../../SDMMC_TEST"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"istream": "cpp",
+			"ostream": "cpp"
+		}
+	}
+}

@@ -1,0 +1,206 @@
+<!doctype html>
+<!--
+  Author: Peter Jensen
+-->
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">  
+  <title>Swim Videos</title>
+  <style>
+    :root {
+      --width:800px;
+    }
+    @media (max-width: 800px) {
+      :root {
+        --width:97%;
+      }
+    }
+    body {
+      font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+      font-size: 14px;
+      width:var(--width);
+      margin:auto;
+    }
+    #video-container {
+      width:100%;
+    }
+    #video-container > video {
+      width:100%;
+    }
+    .header {
+      text-align:center;
+      font-weight:700;
+    }
+    .center {
+      text-align:center;
+    }
+    .button {
+      color:#fff;
+      background-color:rgb(9, 9, 80);
+      padding:6px 12px;
+      border:2px solid #fff;
+    }
+  </style>
+</head>
+<body>
+  <h1 class="header">Swim Videos</h1>
+  <p>
+    For this year's swim, I made a camera device to strap on my back. It kind of worked.  It didn't leak and it took about 15,000 pictures.  Unfortunately, most of them (99%) were of bad quality.  I merged all the pictures into a set of videos each covering about 10 minutes of the hour long event. The camera was able to take about 3 frames per second. The videos below are sped up to 6 frames per second, i.e. 2x real time.
+  </p>
+  <p class="center" id="timespan"></p>
+  <div id="video-container" class="center">
+    <video controls>
+      <source id="video-src">
+    </video>
+  </div>
+  <button data-src="00000000-00600000.mp4" class="button">00:00:00 -> 00:10:00</button>
+  <button data-src="00600000-01200000.mp4" class="button">00:10:00 -> 00:20:00</button>
+  <button data-src="01200000-01800000.mp4" class="button">00:20:00 -> 00:30:00</button>
+  <button data-src="01800000-02400000.mp4" class="button">00:30:00 -> 00:40:00</button>
+  <button data-src="02400000-03000000.mp4" class="button">00:40:00 -> 00:50:00</button>
+  <button data-src="03000000-03600000.mp4" class="button">00:50:00 -> 01:00:00</button>
+  <button data-src="03600000-04200000.mp4" class="button">01:00:00 -> 01:10:00</button>
+<!--
+  <button data-src="04200000-04800000.mp4" class="button">01:10:00 -> 01:20:00</button>
+  <button data-src="04800000-05400000.mp4" class="button">01:20:00 -> 01:30:00</button>
+-->  
+<script>
+// Small JQuery-like utility
+class JQSelect {
+  static createNode(tagName) {
+    // strip off <>
+    tagName = tagName.substring(1, tagName.length-1);
+    return document.createElement(tagName);
+  }
+  constructor(param) {
+    this.elems = null;
+    if (typeof param === "string") {
+      if (param.charAt(0) === "<") {
+        this.elems = [JQSelect.createNode(param)];
+      }
+      else {
+        this.elems = document.querySelectorAll(param);
+      }
+    }
+    else if (param instanceof Element) {
+      this.elems = [param];
+    }
+    else if (typeof param === "function") {
+      window.addEventListener('load', param);
+    }
+  }
+  on(eventName, handler) {
+    this.elems.forEach((e) => e.addEventListener(eventName, handler));
+    return this;
+  }
+  text(txt) {
+    if (this.elems == null)
+      return this;
+    if (typeof txt === 'undefined')
+      return this.elems[0].innerText;
+    else {
+      this.elems.forEach((e) => e.innerText = txt);
+      return this;
+    }
+  }
+  html(txt) {
+    if (this.elems == null)
+      return this;
+    if (typeof txt === 'undefined')
+      return this.elems[0].innerHTML;
+    else {
+      this.elems.forEach((e) => e.innerHTML = txt);
+      return this;
+    }
+  }
+  show() {
+    this.elems.forEach((e) => e.style.display = 'block');
+  }
+  hide() {
+    this.elems.forEach((e) => e.style.display = 'none');
+  }
+  val(...value) {
+    if (value.length === 0) {
+      return this.elems[0].value;
+    }
+    else {
+      return this.attr('value', value[0]);
+    }
+  }
+  empty() {
+    while (this.elems[0].firstChild) {
+      this.elems[0].removeChild(this.elems[0].lastChild);
+    }
+    return this;
+  }
+  append(...nodes) {
+    for (const node of nodes)
+      this.elems[0].appendChild(node.elems[0]);
+    return this;
+  }
+  addClass(cls) {
+    let clsArray = cls.split(/\s+/);
+    this.elems.forEach((e) => e.classList.add(...clsArray));
+    return this;
+  }
+  removeClass(cls) {
+    this.elems.forEach((e) => e.classList.remove(cls));
+    return this;
+  }
+  hasClass(cls) {
+    return this.elems[0].classList.contains(cls);
+  }
+  attr(attrib, ...value) {
+    if (value.length === 0) {
+      return this.elems[0].getAttribute(attrib)
+    }
+    else {
+      this.elems.forEach((e) => e.setAttribute(attrib, value[0]));
+      return this;
+    }
+  }
+  each(callback) {
+    this.elems.forEach((elem) => callback($(elem)));
+  }
+  width() {
+    return this.elems[0].width;
+  }
+  css(prop, ...value) {
+    if (value.length === 0) {
+      return this.elems[0].style[prop];
+    }
+    else {
+      this.elems.forEach((e) => e.style[prop] = value[0]);
+      return this;
+    }
+  }
+}
+function $(param) {
+  return new JQSelect(param);
+}
+// JQuery-like utility end
+
+function main() {
+  const videoSrcDir = "https://danishdude.com/swim-cam/";
+  const $video = $("video");
+  const $videoSrc = $("#video-src");
+  const $btn = $("button");
+  const $timespan = $("#timespan");
+  const $currentBtn = $($btn.elems[0]);
+  function setVideoSrc(src, text) {
+    const videoSrcUrl = videoSrcDir + src;
+    $videoSrc.attr("src", videoSrcUrl);
+    $timespan.text(text);
+    $video.elems[0].load();
+  }
+  function btnClick() {
+    const $thisBtn = $(this);
+    setVideoSrc($thisBtn.attr("data-src"), $thisBtn.text());
+  }
+  $btn.on('click', btnClick);
+  setVideoSrc($currentBtn.attr("data-src"), $currentBtn.text());
+}
+$(main);
+</script>
+</body>
+</html>
